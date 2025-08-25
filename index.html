@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>طلبية المحل</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { margin:0; padding:0; height:100%; width:100%; font-family: 'Cairo', Arial, sans-serif; }
+  body { display:flex; flex-direction: row; }
+
+  /* Sidebar */
+  #sidebar {
+    width: 360px; height:100%; 
+    background: linear-gradient(160deg,#1ecc26,#05409e);
+    padding:25px; overflow-y:auto; 
+    box-shadow:-2px 0 15px rgba(0,0,0,0.25);
+    color:rgb(0, 0, 0);
+  }
+  #sidebar input, #sidebar select, #sidebar textarea {
+    border:2px solid #ffffff55; background:#ffffff10; color:rgb(0, 0, 0);
+  }
+  #sidebar input::placeholder, #sidebar textarea::placeholder { color:#ffffffaa; }
+
+ /* Frame around the whole site - Stunning Style */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0px; bottom: 0px; left: 0px; right: 0px;
+  border-radius: 10px;
+  pointer-events: none; 
+  z-index: 3000;
+  
+  /* Gradient border */
+  border: 13px solid transparent;
+  background: 
+    linear-gradient(45deg, #ff3c00, #ff00d4, #3b82f6, #00ff9e) border-box;
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  /* Glow effect */
+  box-shadow: 0 0 20px #ff3c00aa, 
+              0 0 40px #ff00d4aa, 
+              0 0 60px #3b82f6aa, 
+              0 0 80px #00ff9eaa;
+
+  /* Animation for glowing gradient */
+  animation: glowBorder 100s linear infinite;
+}
+
+@keyframes glowBorder {
+  0% {
+    box-shadow: 0 0 20px #ff3c00aa, 0 0 40px #ff00d4aa, 0 0 60px #3b82f6aa, 0 0 80px #00ff9eaa;
+  }
+  50% {
+    box-shadow: 0 0 30px #ff3c00cc, 0 0 50px #ff00d4cc, 0 0 70px #3b82f6cc, 0 0 90px #00ff9ecc;
+  }
+  100% {
+    box-shadow: 0 0 20px #ff3c00aa, 0 0 40px #ff00d4aa, 0 0 60px #3b82f6aa, 0 0 80px #00ff9eaa;
+  }
+}
+
+  #map { height:100%; flex:50; }
+
+  /* Buttons */
+  #submitBtn, #navigateBtn, #menuBtn {
+    margin-top:10px; font-weight:bold;
+    transition: all 0.3s ease;
+  }
+  #submitBtn:hover, #navigateBtn:hover, #menuBtn:hover { transform:scale(1.05); box-shadow:0 8px 20px rgba(0,0,0,0.3); }
+
+  /* Distance badge */
+  #distanceBadge {
+    display:inline-block; background: rgba(255,255,255,0.2);
+    border:1px solid rgba(255,255,255,0.5);
+    padding:10px; border-radius:12px;
+    text-align:center; font-weight:bold; margin-top:10px;
+    backdrop-filter: blur(6px); color:white;
+  }
+
+  /* MODAL base */
+  .modal { position: fixed; inset: 0; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,0.6); z-index:2000; overflow:auto; }
+  .modal.show { display:flex; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+  .card {
+    background:white; border-radius:20px; padding:25px; width:min(92vw, 450px);
+    box-shadow:0 15px 40px rgba(0,0,0,0.35); text-align:center;
+    transform: scale(0.8); animation: zoomIn 0.3s forwards;
+    position: relative;
+  }
+  @keyframes zoomIn { from{transform:scale(0.8)} to{transform:scale(1)} }
+
+  .card h3 { font-size:1.3rem; color:#1e293b; }
+  .card p { font-size:1rem; color:#475569; }
+  .card button { font-weight:bold; transition: all 0.3s; }
+  .card button:hover { transform: scale(1.05); box-shadow:0 6px 15px rgba(0,0,0,0.3); }
+
+  /* Close X */
+  .closeX {
+    position: absolute; top:10px; right:15px;
+    font-size:1.5rem; font-weight:bold; color:#475569;
+    cursor:pointer;
+  }
+
+  /* Menu images slider */
+  .slider { display:flex; overflow-x:auto; gap:10px; scroll-behavior:smooth; padding:10px 0; }
+  .menu-img { width:250px; height:150px; flex-shrink:0; border-radius:12px; cursor:pointer; object-fit:cover; transition: transform 0.3s; }
+  .menu-img:hover { transform: scale(1.05); }
+
+  .slider-controls { display:flex; justify-content:space-between; margin-bottom:10px; }
+  .slider-controls button { background:#3b82f6; color:white; border:none; border-radius:6px; padding:5px 10px; cursor:pointer; font-weight:bold; }
+  .slider-controls button:hover { background:#1e40af; }
+@media (max-width: 768px) {
+  /* تنظيم الصفحة للهواتف */
+  body {
+    flex-direction: row !important; 
+    font-family: 'Cairo', Arial, sans-serif;
+    font-size: 15px; /* أصغر قليلاً للهواتف */
+    line-height: 20;
+  }
+
+  /* سايدبار */
+  #sidebar {
+    width: 35% !important;
+    height: auto !important;
+    padding: 20px !important;
+    font-size: 0.85rem !important; /* أصغر نصوص السايدبار */
+    display: flex;
+    flex-direction: column; /* الحقول تحت بعض */
+    gap: -5px; /* المسافة بين الحقول */
+    background: linear-gradient(rgba(170, 24, 24, 0.7), rgba(15, 185, 114, 0.7)), url('img/shawerma.jpg') center/cover no-repeat;
+
+  }
+
+  /* الحقول */
+  #sidebar input,
+  #sidebar select,
+  #sidebar textarea {
+    font-size: 0.7rem !important;
+    padding: 8px !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* الأزرار */
+  #submitBtn,
+  #navigateBtn,
+  #menuBtn {
+    font-size: 0.60rem !important;
+    padding: 6px 10px !important;
+    margin-top: 3px;
+  }
+
+  /* Badge المسافة */
+  #distanceBadge {
+    font-size: 0.7rem !important;
+    padding: 5px !important;
+    margin-top: 5px;
+  }
+
+  /* خانات السلايدر */
+  .slider .menu-img {
+    width: 140px !important;
+    height: 90px !important;
+    margin-bottom: 6px;
+  }
+
+  /* كروت المحتوى */
+  .card {
+    width: 90vw !important;
+    padding: 12px !important;
+    font-size: 0.85rem !important;
+    margin-bottom: 8px;
+  }
+
+  /* أيقونات السوشيال في البوب اب */
+  .popup-social-icons {
+    flex-direction: column !important; /* أيقونات تحت بعض */
+    gap: 6px !important; /* تحكم بالمسافة بينهم */
+    align-items: center !important;
+  }
+}
+
+.store-name {
+  font-size: 2.5rem; /* حجم كبير للعنوان */
+  font-weight: 1000;  /* خط غامق جدًا */
+  text-align: center;
+  background: linear-gradient(90deg, #000000, #000000, #000000, #2e009b);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientText 5s ease infinite;
+  
+  text-shadow: 0 0 10px #000000aa, 0 0 20px #000000aa, 0 0 30px #000000aa, 0 0 40px #00ff9eaa;
+}
+
+@keyframes gradientText {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div class="flex justify-center mb-4">
+<img src="img/logo.png" alt="لوجو المحل" 
+     style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
+ </div>
+<h2 class="store-name">إسم المتجر</h2>
+
+  <h2 class="text-2xl font-bold mb-4 text-center text-white">أطلب الأن</h2>
+
+  <label class="block font-semibold mb-1">الإسم</label>
+  <input type="text" id="customerName" class="w-full rounded p-2 mb-4" placeholder="مثلاً: أحمد">
+
+    <label class="block font-semibold mb-1"-------------------------</label>
+
+
+  <label class="block font-semibold mb-1">رقم هاتفك:</label>
+  <input type="text" id="customerPhone" class="w-full rounded p-2 mb-4" placeholder="مثلاً: 0791234567">
+
+    <label class="block font-semibold mb-1"-------------------------</label>
+
+
+ <label class="block font-semibold mb-1 text-lg">اكتب طلبك:</label>
+<textarea 
+    id="orderText" 
+    class="w-full rounded-lg p-3 mb-4 text-base leading-relaxed resize-none" 
+    placeholder="أدخل طلبك هنا..." 
+    rows="3"
+    style="min-height: 80px;"
+    inputmode="text"
+    autocapitalize="sentences"
+></textarea>
+
+    <label class="block font-semibold mb-1"-------------------------</label>
+
+  <button id="menuBtn" onclick="openModal('modalMenu')" class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600 mb-3">عرض القائمة</button>
+
+
+
+
+   <label class="block font-semibold mb-1">اختر طريقة الدفع:</label>
+  <select id="paymentOption" class="w-full rounded p-2 mb-4">
+    <option value="">اختر طريقة الدفع</option>
+    <option value="cash">كاش</option>
+    <option value="visa">فيزا</option>
+  </select>
+    <label class="block font-semibold mb-1"-------------------------</label>
+
+  <label class="block font-semibold mb-1">اختر طريقة الاستلام:</label>
+  <select id="deliveryOption" class="w-full rounded p-2 mb-4" onchange="handleDeliveryOption()">
+    <option value="">اختر الطريقة</option>
+    <option value="pickup">استلام من المحل</option>
+    <option value="delivery">توصيل</option>
+  </select>
+    <label class="block font-semibold mb-1"-------------------------</label>
+
+  <div id="arrivalTimeDiv" class="mb-4" style="display:none;">
+    <label class="block font-semibold mb-1">الوقت المتوقع للوصول:</label>
+    <input type="time" id="arrivalTime" class="w-full rounded p-2">
+  </div>
+
+     <label class="block font-semibold mb-1"-------------------------</label>
+
+
+  <button id="submitBtn" onclick="openSendOrEditModal()" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 mb-3">ارسال الطلب</button>
+  <button id="navigateBtn" onclick="navigateToShop()" class="w-full bg-yellow-400 text-white py-2 rounded hover:bg-yellow-500">الذهاب للمحل</button>
+
+  <div id="distanceBadge" class="hidden mt-3"></div>
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<!-- Modals -->
+<!-- Menu Modal -->
+<div id="modalMenu" class="modal">
+  <div class="card" style="max-width:95vw;">
+    <span class="closeX" onclick="closeModal('modalMenu')">✖</span>
+    <h3 class="mb-2">الأصناف</h3>
+    <p class="mb-2"></p>
+    <div class="slider" id="menuSlider">
+      <img src="img/brosted.jpg" class="menu-img" onclick="openImage(this.src)">
+      <img src="img/burger.jpg" class="menu-img" onclick="openImage(this.src)">
+      <img src="img/grocary.jpg" class="menu-img" onclick="openImage(this.src)">
+      <img src="img/shawerma.jpg" class="menu-img" onclick="openImage(this.src)">
+      <img src="img/grocary.jpg" class="menu-img" onclick="openImage(this.src)">
+    </div>
+    <div class="slider-controls">
+      <button onclick="scrollSlider(-1)">&#8592; السابق</button>
+      <button onclick="scrollSlider(1)">التالي &#8594;</button>
+    </div>
+  </div>
+</div>
+
+<!-- Full Image Modal -->
+<div id="modalImage" class="modal">
+  <div class="card" style="max-width:90vw;">
+    <span class="closeX" onclick="closeModal('modalImage')">✖</span>
+    <img id="fullImage" src="" style="width:100%; border-radius:12px; margin-bottom:10px;">
+    <a id="downloadLink" href="" download class="w-full inline-block bg-green-500 text-white py-2 rounded hover:bg-green-600">تنزيل الصورة</a>
+  </div>
+</div>
+
+<!-- Share Modal -->
+<div id="modalShare" class="modal">
+  <div class="card">
+    <h3 class="mb-2">تنبيه الخصوصية</h3>
+    <p class="mb-4">سيتم مشاركة موقعك الحالي مع المحل لحساب المسافة وأفضل طريق.</p>
+    <div class="flex gap-2">
+      <button class="flex-1 bg-gray-200 py-2 rounded" onclick="closeModal('modalShare')">تعديل</button>
+      <button class="flex-1 bg-blue-600 text-white py-2 rounded" onclick="confirmShareLocation()">موافق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Send Modal -->
+<div id="modalSend" class="modal">
+  <div class="card">
+    <h3 class="mb-2">إرسال الطلب</h3>
+    <p class="mb-4">هل تريد إرسال الطلب الآن أم تعديل البيانات؟</p>
+    <div class="flex gap-2">
+      <button class="flex-1 bg-gray-200 py-2 rounded" onclick="closeModal('modalSend')">تعديل</button>
+      <button class="flex-1 bg-green-500 text-white py-2 rounded" onclick="sendOrder()">إرسال</button>
+    </div>
+  </div>
+</div>
+
+<!-- Thanks Modal -->
+<div id="modalThanks" class="modal">
+  <div class="card">
+    <h3 class="mb-2">شكرًا!</h3>
+    <p class="mb-4">تم إرسال الطلب. يرجى انتظار تأكيد المحل.</p>
+    <div class="flex gap-2">
+      <button class="flex-1 bg-yellow-400 text-white py-2 rounded" onclick="afterThanks()">الذهاب للمحل</button>
+      <button class="flex-1 bg-gray-200 py-2 rounded" onclick="closeModal('modalThanks')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const shopLat = 31.9539, shopLng = 35.9106;
+  const waPhone = "+962789540656";
+  let map, userMarker, routeLayer, shopMarker;
+  let lastRouteDistance = null;
+
+  // أيقونات
+  const shopIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/869/869636.png", // متجر
+    iconSize: [50, 50],
+    iconAnchor: [25, 50],
+    popupAnchor: [0, -45]
+  });
+
+  const userIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/1077/1077012.png", // شخص
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -35]
+  });
+
+  // الخريطة
+  map = L.map('map').setView([shopLat, shopLng], 17);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+// المتجر + بوب-آب أنيق مع شفافية قابلة للتحكم وإطار جذاب
+const popupBgOpacity = 0.7; // قيمه من 0 (شفاف تماما) إلى 1 (معتم بالكامل)
+
+shopMarker = L.marker([shopLat, shopLng], { icon: shopIcon })
+  .addTo(map)
+  .bindPopup(`
+    <div style="
+      text-align:center;
+      font-family:Cairo, Tahoma, sans-serif;
+      border-radius:12px; /* حواف مدورة أكبر */
+      padding:12px;
+      box-shadow:0 6px 15px rgba(0,0,0,0.25); /* ظل خارجي */
+      border:2px solid #3498db; /* الإطار الرئيسي */
+      background: linear-gradient(rgba(255,255,255,${popupBgOpacity}), rgba(255,255,255,${popupBgOpacity})), url('img/logo.png') center/cover no-repeat;
+      max-width:200px;
+      overflow:hidden;
+      max-height:200px;
+    ">
+      <!-- لوجو المحل -->
+      <img src="img/logo.png"
+           alt="لوجو المحل"
+           class="popup-logo"
+           style="width:55px;height:55px;border-radius:50%;border:3px solid #3498db;margin-bottom:8px;object-fit:cover;">
+      
+      <!-- اسم المحل -->
+      <h3 class="popup-title" style="margin:4px 0;font-size:15px;color:#2c3e50;font-weight:bold;">🛍️ متجر الأحلام</h3>
+      
+      <!-- العنوان -->
+      <p class="popup-address" style="margin:2px 0;font-size:11px;color:#000000;font-weight:bold;">📍 العنوان: شارع الملكة، وسط المدينة</p>
+
+      <!-- رقم الهاتف -->
+      <p class="popup-phone" style="margin:2px 0;font-size:12px;font-weight:bold;color:#2c3e50;">
+        📞 <a href="tel:+962789540656" style="color:#000000;text-decoration:none;font-weight:bold;">+962********</a>
+      </p>
+      
+      <!-- أيقونات السوشيال -->
+      <div class="popup-social" style="margin-top:6px;font-weight:bold;">
+        <a href="instagram://user?username=your_instagram_username" class="social-link" style="margin:0 5px;">
+          <img src="img/insta.png" width="15" alt="Instagram"> www.*******.com
+        </a>
+        <a href="fb://page/your_facebook_page_id" class="social-link" style="margin:0 5px;">
+          <img src="img/facebook.png" width="15" alt="Facebook"> www.*******.com
+        </a>
+      </div>
+
+      <style>
+        /* تصغير افتراضي للهاتف */
+        @media (min-width: 768px) {
+          .leaflet-popup-content-wrapper {
+            max-width: 250px !important;
+          }
+          .popup-logo { width:70px; height:70px; border-width:3px; }
+          .popup-title { font-size:17px; }
+          .popup-address { font-size:12px; }
+          .popup-phone { font-size:13px; }
+          .popup-social img { width:30px; }
+        }
+
+        /* تأثير الظل والحركة عند الضغط أو اللمس */
+        .social-link {
+          display:inline-flex;
+          align-items:center;
+          transition: transform 0.2s, box-shadow 0.2s;
+          padding:3px 5px;
+          border-radius:6px;
+        }
+        .social-link img {
+          margin-right:5px;
+        }
+        .social-link:active, .social-link:focus {
+          transform: scale(1.1);
+          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+      </style>
+    </div>
+  `)
+  .openPopup();
+
+
+
+
+
+  // باقي الكود نفس ما عندك ↓↓↓
+  function openModal(id){ document.getElementById(id).classList.add('show'); }
+  function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+  function openImage(src){
+    document.getElementById('fullImage').src = src;
+    document.getElementById('downloadLink').href = src;
+    openModal('modalImage');
+  }
+  function scrollSlider(direction){
+    const slider = document.getElementById('menuSlider');
+    slider.scrollBy({ left: direction * 260, behavior: 'smooth' });
+  }
+
+  function handleDeliveryOption(){
+    const option = document.getElementById('deliveryOption').value;
+    if(option === 'delivery'){
+      document.getElementById('arrivalTimeDiv').style.display = 'none';
+      openModal('modalShare');
+    }else if(option === 'pickup'){
+      document.getElementById('arrivalTimeDiv').style.display = 'block';
+      document.getElementById('submitBtn').style.display = 'inline-block';
+      if(routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+      if(userMarker) { map.removeLayer(userMarker); userMarker = null; }
+      document.getElementById('distanceBadge').classList.add('hidden');
+      lastRouteDistance = null;
+    }else{
+      document.getElementById('arrivalTimeDiv').style.display = 'none';
+      document.getElementById('submitBtn').style.display = 'none';
+    }
+  }
+
+  function confirmShareLocation(){ closeModal('modalShare'); locateUserAndRoute(); }
+
+  function locateUserAndRoute(){
+    if(!navigator.geolocation){ alert("ميزة تحديد الموقع غير مدعومة"); return; }
+    navigator.geolocation.getCurrentPosition(async (pos)=>{
+      const uLat = pos.coords.latitude;
+      const uLng = pos.coords.longitude;
+      if(userMarker) map.removeLayer(userMarker);
+
+      userMarker = L.marker([uLat,uLng], { icon: userIcon })
+        .addTo(map).bindPopup("📍 موقعك الحالي").openPopup();
+
+      try{
+        const url = `https://router.project-osrm.org/route/v1/driving/${uLng},${uLat};${shopLng},${shopLat}?overview=full&geometries=geojson&alternatives=false&steps=false`;
+        const res = await fetch(url); const data = await res.json();
+        if(data.code!=='Ok' || !data.routes || !data.routes.length) throw new Error('لا يوجد مسار');
+        const route = data.routes[0]; lastRouteDistance = route.distance;
+        const coords = route.geometry.coordinates.map(c=>[c[1],c[0]]);
+        if(routeLayer) map.removeLayer(routeLayer);
+        routeLayer = L.polyline(coords, { weight:5, color:"#3498db" }).addTo(map);
+        const bounds = L.latLngBounds(coords); map.fitBounds(bounds, { padding:[40,40] });
+        const km = (lastRouteDistance/1000).toFixed(2);
+        const badge = document.getElementById('distanceBadge');
+        badge.textContent = `المسافة عبر الطريق: ${km} كم تقريبًا`;
+        badge.classList.remove('hidden');
+        document.getElementById('submitBtn').style.display = 'inline-block';
+        openModal('modalSend');
+      }catch(e){ 
+        console.error(e); 
+        alert("تعذر جلب المسار الأرضي حاليًا"); 
+        document.getElementById('submitBtn').style.display = 'inline-block'; 
+        openModal('modalSend'); 
+      }
+    }, ()=>{ alert("تعذر الحصول على موقعك."); }, { enableHighAccuracy:true, timeout:10000 });
+  }
+
+  function openSendOrEditModal(){ openModal('modalSend'); }
+
+  function sendOrder(){
+    closeModal('modalSend');
+    const name = document.getElementById('customerName').value.trim();
+    const phone = document.getElementById('customerPhone').value.trim();
+    const order = document.getElementById('orderText').value.trim();
+    const option = document.getElementById('deliveryOption').value;
+    const arrivalTime = document.getElementById('arrivalTime').value;
+    const payment = document.getElementById('paymentOption').value;
+    if(!name || !phone || !order || !option || !payment){ alert("من فضلك املأ جميع الحقول!"); return; }
+    let message = `طلب جديد:%0Aالاسم: ${name}%0Aالهاتف: ${phone}%0Aالطلب: ${order}%0Aطريقة الاستلام: ${option==='delivery'?'توصيل':'استلام من المحل'}%0Aطريقة الدفع: ${payment}`;
+    if(option==='pickup' && arrivalTime) message+=`%0Aالوقت المتوقع للوصول: ${arrivalTime}`;
+    if(option==='delivery' && userMarker){
+      const {lat,lng} = userMarker.getLatLng();
+      message+=`%0Aموقع الزبون: https://www.google.com/maps?q=${lat},${lng}`;
+      if(lastRouteDistance!==null){ 
+        const km=(lastRouteDistance/1000).toFixed(2); 
+        message+=`%0Aالمسافة عبر الطريق: ${km} كم تقريبًا`; 
+      } 
+    }
+    window.open(`https://wa.me/${waPhone}?text=${message}`,"_blank");
+    openModal('modalThanks');
+  }
+
+  function afterThanks(){ closeModal('modalThanks'); navigateToShop(); }
+
+  function navigateToShop(){
+    if(userMarker){
+      const {lat,lng}=userMarker.getLatLng();
+      window.open(`https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${shopLat},${shopLng}&travelmode=driving`,'_blank');
+    }else{
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${shopLat},${shopLng}&travelmode=driving`,'_blank');
+    }
+  }
+</script>
+
+
+
+</body>
+</html>
