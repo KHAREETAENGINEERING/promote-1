@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>طلبية المحل</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/kjua@0.1.1/dist/kjua.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -21,7 +22,13 @@
   }
   #sidebar input, #sidebar select, #sidebar textarea {
     border:2px solid #ffffff55; background:#ffffff10; color:rgb(0, 0, 0);
+    .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
+#menuSlider::-webkit-scrollbar { height: 6px; }
+#menuSlider::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.3); border-radius: 3px; }
+#menuSlider.active { cursor: grabbing; cursor: -webkit-grabbing; }
+
   }
+
   #sidebar input::placeholder, #sidebar textarea::placeholder { color:#ffffffaa; }
 
  /* Frame around the whole site - Stunning Style */
@@ -222,31 +229,37 @@ body::before {
   <label class="block font-semibold mb-1">الإسم</label>
   <input type="text" id="customerName" class="w-full rounded p-2 mb-4" placeholder="مثلاً: أحمد">
 
-    <label class="block font-semibold mb-1"-------------------------</label>
 
 
   <label class="block font-semibold mb-1">رقم هاتفك:</label>
   <input type="text" id="customerPhone" class="w-full rounded p-2 mb-4" placeholder="مثلاً: 0791234567">
 
-    <label class="block font-semibold mb-1"-------------------------</label>
 
-
- <label class="block font-semibold mb-1 text-lg">اكتب طلبك:</label>
+<label class="block font-semibold mb-1 text-lg">اكتب طلبك:</label>
 <textarea 
     id="orderText" 
     class="w-full rounded-lg p-3 mb-4 text-base leading-relaxed resize-none" 
-    placeholder="أدخل طلبك هنا..." 
+    placeholder="سيظهر هنا الطلب بعد الإضافة..." 
     rows="3"
     style="min-height: 80px;"
-    inputmode="text"
-    autocapitalize="sentences"
+    readonly
 ></textarea>
 
-    <label class="block font-semibold mb-1"-------------------------</label>
+<button id="menuBtn" onclick="openModal('modalMenu')" class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600 mb-3">عرض القائمة</button>
 
-  <button id="menuBtn" onclick="openModal('modalMenu')" class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600 mb-3">عرض القائمة</button>
+<!-- Menu Modal -->
+<div id="modalMenu" class="modal" style="display:none;">
+  <div class="card p-4 rounded-lg shadow-lg max-w-[95vw] mx-auto bg-white relative">
+    <span class="closeX absolute top-2 right-2 cursor-pointer text-xl font-bold" onclick="closeModal('modalMenu')">✖</span>
+    <h3 class="text-xl font-bold mb-4 text-center">الأصناف</h3>
+    <div id="menuSlider" class="flex overflow-x-auto gap-4 pb-2 cursor-grab"></div>
 
+    <h4 class="font-semibold mt-4 mb-2">الطلبات الحالية:</h4>
+    <ul id="orderList" class="mb-4 max-h-48 overflow-y-auto border p-2 rounded bg-gray-50"></ul>
 
+    <button class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600" onclick="confirmOrder()">تأكيد الطلب</button>
+  </div>
+</div>
 
 
    <label class="block font-semibold mb-1">اختر طريقة الدفع:</label>
@@ -255,7 +268,6 @@ body::before {
     <option value="cash">كاش</option>
     <option value="visa">فيزا</option>
   </select>
-    <label class="block font-semibold mb-1"-------------------------</label>
 
   <label class="block font-semibold mb-1">اختر طريقة الاستلام:</label>
   <select id="deliveryOption" class="w-full rounded p-2 mb-4" onchange="handleDeliveryOption()">
@@ -272,9 +284,36 @@ body::before {
 
      <label class="block font-semibold mb-1"-------------------------</label>
 
-
+<label class="block font-semibold mb-1">انشاء QR للطلب</label>
+<div id="qrCodeDiv" class="mb-2"></div>
+<button id="generateQRBtn" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 mb-3" onclick="generateQR()">انشاء QR للطلب</button>
+<a id="downloadQR" class="w-full inline-block bg-green-500 text-white py-2 rounded hover:bg-green-600 mb-3 text-center" download="orderQR.png" style="display:none;">تحميل QR</a>
   <button id="submitBtn" onclick="openSendOrEditModal()" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 mb-3">ارسال الطلب</button>
   <button id="navigateBtn" onclick="navigateToShop()" class="w-full bg-yellow-400 text-white py-2 rounded hover:bg-yellow-500">الذهاب للمحل</button>
+  <!-- أيقونات السوشيال + روابط إضافية -->
+<div class="popup-social" style="margin-top:6px; font-weight:bold; display:flex; flex-direction:column; gap:5px;">
+
+  <!-- Instagram -->
+  <a href="instagram://user?username=your_instagram_username" class="social-link" style="display:flex; align-items:center; gap:5px;">
+    <img src="img/insta.png" width="15" alt="Instagram"> www.*******.com
+  </a>
+
+  <!-- Facebook -->
+  <a href="fb://page/your_facebook_page_id" class="social-link" style="display:flex; align-items:center; gap:5px;">
+    <img src="img/facebook.png" width="15" alt="Facebook"> www.*******.com
+  </a>
+
+  <!-- طلبات -->
+  <a href="your_orders_link" class="social-link" style="display:flex; align-items:center; gap:5px;">
+    <img src="img/orders.png" width="15" alt="طلبات"> www.*******.com
+  </a>
+
+  <!-- هنجر ستيشن -->
+  <a href="your_hanger_station_link" class="social-link" style="display:flex; align-items:center; gap:5px;">
+    <img src="img/hanger.png" width="15" alt="هنجر ستيشن"> www.*******.com
+  </a>
+
+</div>
 
   <div id="distanceBadge" class="hidden mt-3"></div>
 </div>
@@ -389,9 +428,9 @@ shopMarker = L.marker([shopLat, shopLng], { icon: shopIcon })
       box-shadow:0 6px 15px rgba(0,0,0,0.25); /* ظل خارجي */
       border:2px solid #3498db; /* الإطار الرئيسي */
       background: linear-gradient(rgba(255,255,255,${popupBgOpacity}), rgba(255,255,255,${popupBgOpacity})), url('img/logo.png') center/cover no-repeat;
-      max-width:200px;
+      max-width:150px;
       overflow:hidden;
-      max-height:200px;
+      max-height:150px;
     ">
       <!-- لوجو المحل -->
       <img src="img/logo.png"
@@ -400,25 +439,17 @@ shopMarker = L.marker([shopLat, shopLng], { icon: shopIcon })
            style="width:55px;height:55px;border-radius:50%;border:3px solid #3498db;margin-bottom:8px;object-fit:cover;">
       
       <!-- اسم المحل -->
-      <h3 class="popup-title" style="margin:4px 0;font-size:15px;color:#2c3e50;font-weight:bold;">🛍️ متجر الأحلام</h3>
+      <h3 class="popup-title" style="margin:4px 0;font-size:10px;color:#2c3e50;font-weight:bold;">🛍️ متجر الأحلام</h3>
       
       <!-- العنوان -->
-      <p class="popup-address" style="margin:2px 0;font-size:11px;color:#000000;font-weight:bold;">📍 العنوان: شارع الملكة، وسط المدينة</p>
+      <p class="popup-address" style="margin:2px 0;font-size:10px;color:#000000;font-weight:bold;">📍 العنوان: شارع الملكة، وسط المدينة</p>
 
       <!-- رقم الهاتف -->
       <p class="popup-phone" style="margin:2px 0;font-size:12px;font-weight:bold;color:#2c3e50;">
         📞 <a href="tel:+962789540656" style="color:#000000;text-decoration:none;font-weight:bold;">+962********</a>
       </p>
       
-      <!-- أيقونات السوشيال -->
-      <div class="popup-social" style="margin-top:6px;font-weight:bold;">
-        <a href="instagram://user?username=your_instagram_username" class="social-link" style="margin:0 5px;">
-          <img src="img/insta.png" width="15" alt="Instagram"> www.*******.com
-        </a>
-        <a href="fb://page/your_facebook_page_id" class="social-link" style="margin:0 5px;">
-          <img src="img/facebook.png" width="15" alt="Facebook"> www.*******.com
-        </a>
-      </div>
+      
 
       <style>
         /* تصغير افتراضي للهاتف */
@@ -560,6 +591,140 @@ shopMarker = L.marker([shopLat, shopLng], { icon: shopIcon })
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${shopLat},${shopLng}&travelmode=driving`,'_blank');
     }
   }
+  const menuItems = [
+  { name: "برجر", img: "img/burger.jpg" },
+  { name: "شاورما", img: "img/shawerma.jpg" },
+  { name: "بروستد", img: "img/brosted.jpg" },
+  { name: "خضار", img: "img/grocary.jpg" }
+];
+
+let currentOrder = []; // لتجميع الطلبات قبل الإرسال
+
+function openModal(id) {
+  document.getElementById(id).style.display = 'flex';
+  if(id === 'modalMenu') renderMenuItems();
+}
+
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+function renderMenuItems() {
+  const slider = document.getElementById('menuSlider');
+  slider.innerHTML = '';
+  menuItems.forEach(item => {
+    const div = document.createElement('div');
+    div.className = "flex-shrink-0 w-40 bg-gray-50 rounded-lg shadow p-3 text-center relative transition-transform duration-200";
+    div.innerHTML = `
+      <img src="${item.img}" class="w-full h-32 object-cover rounded mb-2">
+      <p class="font-semibold mb-2">${item.name}</p>
+      <div class="flex items-center justify-center gap-2 mb-2">
+        <button class="qtyBtn bg-gray-200 px-2 rounded">-</button>
+        <input type="number" min="1" value="1" class="w-12 text-center rounded border p-1 quantityInput">
+        <button class="qtyBtn bg-gray-200 px-2 rounded">+</button>
+      </div>
+      <button class="w-full bg-green-500 text-white py-1 rounded hover:bg-green-600 addBtn">إضافة</button>
+    `;
+    const input = div.querySelector('.quantityInput');
+    div.querySelectorAll('.qtyBtn')[0].addEventListener('click', () => input.value = Math.max(1, parseInt(input.value)-1));
+    div.querySelectorAll('.qtyBtn')[1].addEventListener('click', () => input.value = parseInt(input.value)+1);
+
+    div.querySelector('.addBtn').addEventListener('click', () => {
+      const qty = parseInt(input.value);
+      const existing = currentOrder.find(o => o.name === item.name);
+      if(existing) existing.qty += qty;
+      else currentOrder.push({ name: item.name, qty });
+      updateOrderList();
+      input.value = 1;
+      div.classList.add('scale-105');
+      setTimeout(()=> div.classList.remove('scale-105'), 200);
+    });
+
+    slider.appendChild(div);
+  });
+
+  // تمكين السحب بالماوس/المس للسلايدر
+  let isDown = false, startX, scrollLeft;
+  slider.addEventListener('mousedown', e => { isDown = true; slider.classList.add('active'); startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft; });
+  slider.addEventListener('mouseleave', () => isDown = false);
+  slider.addEventListener('mouseup', () => isDown = false);
+  slider.addEventListener('mousemove', e => { if(!isDown) return; e.preventDefault(); const x = e.pageX - slider.offsetLeft; slider.scrollLeft = scrollLeft - (x - startX) * 2; });
+}
+
+function updateOrderList() {
+  const ul = document.getElementById('orderList');
+  ul.innerHTML = '';
+  currentOrder.forEach((o, idx) => {
+    const li = document.createElement('li');
+    li.className = 'flex justify-between items-center py-1 px-2 bg-white mb-1 rounded shadow-sm';
+    li.innerHTML = `
+      <span>${o.name} x${o.qty}</span>
+      <div class="flex gap-1">
+        <button onclick="changeQty(${idx}, -1)" class="bg-gray-200 px-2 rounded">-</button>
+        <button onclick="changeQty(${idx}, 1)" class="bg-gray-200 px-2 rounded">+</button>
+        <button onclick="removeItem(${idx})" class="bg-red-500 text-white px-2 rounded">حذف</button>
+      </div>
+    `;
+    ul.appendChild(li);
+  });
+}
+
+function changeQty(idx, delta) {
+  currentOrder[idx].qty = Math.max(1, currentOrder[idx].qty + delta);
+  updateOrderList();
+}
+
+function removeItem(idx) {
+  currentOrder.splice(idx,1);
+  updateOrderList();
+}
+
+function confirmOrder() {
+  const textArea = document.getElementById('orderText');
+  textArea.value = currentOrder.map(o => `${o.name} x${o.qty}`).join('\n');
+  closeModal('modalMenu');
+}
+function generateQR() {
+    // جمع كل البيانات
+    const name = document.getElementById('customerName').value.trim();
+    const phone = document.getElementById('customerPhone').value.trim();
+    const order = document.getElementById('orderText').value.trim();
+    const payment = document.getElementById('paymentOption').value;
+    const delivery = document.getElementById('deliveryOption').value;
+    const arrivalTime = document.getElementById('arrivalTime').value;
+
+    if(!name || !phone || !order || !payment || !delivery){
+        alert("من فضلك املأ جميع الحقول قبل إنشاء QR");
+        return;
+    }
+
+    // إعداد نص QR
+    let qrText = `طلب جديد:\nالاسم: ${name}\nالهاتف: ${phone}\nالطلب: ${order}\nطريقة الدفع: ${payment}\nطريقة الاستلام: ${delivery}`;
+    if(delivery==='pickup' && arrivalTime) qrText += `\nالوقت المتوقع للوصول: ${arrivalTime}`;
+    
+    // إذا عندك موقع الزبون يمكن تضيفه
+    if(delivery==='delivery' && userMarker){
+        const {lat,lng} = userMarker.getLatLng();
+        qrText += `\nموقع الزبون: https://www.google.com/maps?q=${lat},${lng}`;
+    }
+
+    // إنشاء الـ QR
+    const qrDiv = document.getElementById('qrCodeDiv');
+    qrDiv.innerHTML = ''; // مسح أي QR قديم
+    const qr = kjua({
+        text: qrText,
+        size: 200,
+        fill: '#000',
+        render: 'image',
+        ecLevel: 'H',
+        rounded: 0,
+        quiet: 1,
+        mode: 'plain' // بدون NO LABEL
+    });
+    qrDiv.appendChild(qr);
+}
+
+
 </script>
 
 
